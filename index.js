@@ -1,16 +1,24 @@
 // ---------------------
-// DEPENDENCIES
+// EXPRESS SERVER (Replit compatible)
 // ---------------------
-const mineflayer = require('mineflayer')
-const { pathfinder, Movements, goals: { GoalBlock } } = require('mineflayer-pathfinder')
-const mcDataLoader = require('minecraft-data')
-const config = require('./settings.json')
+const express = require('express');
+const app = express();
+const port = process.env.PORT || 3000;
+
+app.get('/', (req, res) => res.send('AFK Bot is alive!'));
+app.listen(port, '0.0.0.0', () => console.log(`[Server] Listening on port ${port}`));
 
 // ---------------------
-// BOT CREATION
+// MINECRAFT BOT
 // ---------------------
-let bot
-let leaveTimeout = null
+const mineflayer = require('mineflayer');
+const { pathfinder, Movements, goals: { GoalNear } } = require('mineflayer-pathfinder');
+const collectBlock = require('mineflayer-collectblock').plugin;
+const config = require('./settings.json');
+
+let bot;
+let leaveTimeout = null;
+let stayOffline = false;
 
 function createBot() {
   bot = mineflayer.createBot({
@@ -20,149 +28,107 @@ function createBot() {
     host: config.server.ip,
     port: config.server.port,
     version: config.server.version
-  })
+  });
 
-  bot.loadPlugin(pathfinder)
+  bot.loadPlugin(pathfinder);
+  bot.loadPlugin(collectBlock);
 
+  const mcData = require('minecraft-data')(bot.version);
+  const defaultMove = new Movements(bot, mcData);
+
+  // Spawn logic
   bot.once('spawn', () => {
-    console.log('[Bot] Spawned on server')
+    console.log('[Bot] Spawned on server');
+    bot.pathfinder.setMovements(defaultMove);
 
-    const mcData = mcDataLoader(bot.version)
-    const defaultMove = new Movements(bot, mcData)
-    defaultMove.canDig = true // allow breaking blocks like leaves
-    bot.pathfinder.setMovements(defaultMove)
+    // Start looking for trees every 20s
+    setInterval(chopTree, 20000);
 
-    // Auto login/register (if server needs)
-    if (config.utils['auto-auth'].enabled) {
-      const password = config.utils['auto-auth'].password
-      bot.chat(`/login ${password}`)
-      console.log('[Auth] Sent /login')
-    }
+    // Night check → sleep if bed nearby
+    setInterval(checkNightAndSleep, 10000);
+  });
 
-    // Start farming
-    chopTree()
-  })
-
-  // --- Human detection ---
+  // Leave when human joins
   bot.on('playerJoined', (player) => {
-    if (player.username === bot.username) return
-    console.log(`[Bot] Human joined: ${player.username}`)
-
+    if (player.username === bot.username) return;
+    console.log(`[Bot] Human joined: ${player.username}`);
     if (!leaveTimeout) {
       leaveTimeout = setTimeout(() => {
-        console.log('[Bot] Leaving world because humans are online')
-        bot.quit('Humans online, AFK bot leaving.')
-      }, 30000) // leave after 30 sec
+        stayOffline = true; // don’t reconnect while human online
+        bot.quit('Human online, leaving.');
+      }, 30000); // leave after 30s
     }
-  })
+  });
 
+  // Rejoin when humans leave
   bot.on('playerLeft', () => {
     const humans = Object.values(bot.players).filter(
       p => p.username !== bot.username && p.ping !== undefined
-    )
-
+    );
     if (humans.length === 0) {
-      console.log('[Bot] No humans online. Rejoining...')
+      console.log('[Bot] No humans online. Rejoining...');
+      stayOffline = false;
       if (leaveTimeout) {
-        clearTimeout(leaveTimeout)
-        leaveTimeout = null
+        clearTimeout(leaveTimeout);
+        leaveTimeout = null;
       }
-      setTimeout(createBot, 2000)
+      setTimeout(createBot, 3000);
     }
-  })
+  });
 
-  // Auto-reconnect on disconnect
+  // Auto-reconnect
   bot.on('end', () => {
-    console.log('[Bot] Disconnected, retrying...')
-    setTimeout(createBot, config.utils['auto-recconect-delay'] || 5000)
-  })
+    if (!stayOffline) {
+      console.log('[Bot] Disconnected. Reconnecting...');
+      setTimeout(createBot, config.utils['auto-recconect-delay'] || 5000);
+    } else {
+      console.log('[Bot] Offline because human is online.');
+    }
+  });
 
-  bot.on('kicked', reason => console.log(`[Bot] Kicked: ${reason}`))
-  bot.on('error', err => console.log(`[Bot Error] ${err.message}`))
-}
+  bot.on('kicked', reason => console.log(`[Bot] Kicked: ${reason}`));
+  bot.on('error', err => console.log(`[Bot Error] ${err.message}`));
 
-// ---------------------
-// INVENTORY CHECK
-// ---------------------
-function isInventoryFull() {
-  return bot.inventory.emptySlotCount() === 0
-}
+  // === TREE LOGIC ===
+  function chopTree() {
+    const woodIds = [
+      mcData.blocksByName.oak_log.id,
+      mcData.blocksByName.birch_log.id,
+      mcData.blocksByName.spruce_log.id,
+      mcData.blocksByName.jungle_log.id,
+      mcData.blocksByName.acacia_log.id,
+      mcData.blocksByName.dark_oak_log.id
+    ];
+    const block = bot.findBlock({
+      matching: woodIds,
+      maxDistance: 64 // bigger search radius
+    });
+    if (block) {
+      console.log(`[Bot] Found tree at ${block.position}, chopping...`);
+      bot.collectBlock.collect(block).catch(err => {
+        console.log('[Collect Error]', err);
+      });
+    } else {
+      console.log('[Bot] No tree found nearby.');
+    }
+  }
 
-// ---------------------
-// CHEST DEPOSIT LOGIC
-// ---------------------
-async function depositWood() {
-  try {
-    const chestPos = config.chest // { "x": 100, "y": 64, "z": 200 }
-    await bot.pathfinder.goto(new GoalBlock(chestPos.x, chestPos.y, chestPos.z))
-
-    const chestBlock = bot.blockAt(chestPos)
-    const chest = await bot.openChest(chestBlock)
-
-    for (const item of bot.inventory.items()) {
-      if (item.name.includes('log')) {
-        await chest.deposit(item.type, null, item.count)
-        console.log(`[Bot] Deposited ${item.count}x ${item.name}`)
+  // === SLEEPING LOGIC ===
+  function checkNightAndSleep() {
+    if (bot.time.timeOfDay > 13000 && bot.time.timeOfDay < 23000) {
+      const bed = bot.findBlock({
+        matching: block => block.name.includes('bed'),
+        maxDistance: 32
+      });
+      if (bed) {
+        bot.sleep(bed).then(() => {
+          console.log('[Bot] Sleeping...');
+        }).catch(err => {
+          console.log('[Sleep Error]', err.message);
+        });
       }
     }
-
-    chest.close()
-  } catch (err) {
-    console.log('[Deposit Error]', err)
   }
 }
 
-// ---------------------
-// TREE CHOPPING LOGIC
-// ---------------------
-async function chopTree() {
-  try {
-    const tree = bot.findBlock({
-      matching: block => block.name.includes('log'),
-      maxDistance: 32
-    })
-
-    if (!tree) {
-      console.log('[Bot] No trees nearby, waiting...')
-      setTimeout(chopTree, 5000)
-      return
-    }
-
-    // walk to tree
-    await bot.pathfinder.goto(new GoalBlock(tree.position.x, tree.position.y, tree.position.z))
-
-    // chop connected logs upward
-    let current = tree
-    while (current) {
-      try {
-        await bot.dig(bot.blockAt(current.position))
-      } catch (err) {
-        console.log('[Dig Error]', err)
-        break
-      }
-
-      // look for another log nearby (part of same tree)
-      current = bot.findBlock({
-        matching: block => block.name.includes('log'),
-        maxDistance: 3
-      })
-    }
-
-    // check inventory
-    if (isInventoryFull()) {
-      await depositWood()
-    }
-
-    console.log('[Bot] Tree chopped, searching for next...')
-    setTimeout(chopTree, 2000)
-
-  } catch (err) {
-    console.log('[Chop Error]', err)
-    setTimeout(chopTree, 5000)
-  }
-}
-
-// ---------------------
-// START BOT
-// ---------------------
-createBot()
+createBot();
