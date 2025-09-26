@@ -20,7 +20,6 @@ function startBot() {
   bot.loadPlugin(pathfinder)
   bot.loadPlugin(autoeat)
 
-  // Logging
   bot.on('chat', (username, message) => {
     if (settings.utils["chat-log"]) console.log(`[CHAT] <${username}> ${message}`)
   })
@@ -32,13 +31,12 @@ function startBot() {
     bot.pathfinder.setMovements(defaultMove)
 
     if (settings.wood-collector.enabled) {
-      setInterval(treeLoop, 10000) // every 10s check for trees
+      setInterval(treeLoop, 10000)
     }
 
     nightLoop()
   })
 
-  // Auto reconnect
   bot.on('end', () => {
     if (settings.utils["auto-reconnect"]) {
       console.log("⏳ Bot disconnected, reconnecting...")
@@ -46,7 +44,6 @@ function startBot() {
     }
   })
 
-  // Human detection → leave after delay
   if (settings["human-detection"].enabled) {
     bot.on('playerJoined', (player) => {
       if (player.username !== bot.username) {
@@ -57,7 +54,6 @@ function startBot() {
   }
 }
 
-// Night → sleep at bed
 function nightLoop() {
   setInterval(async () => {
     if (settings.wood-collector.bed.enabled) {
@@ -82,7 +78,6 @@ function nightLoop() {
   }, 20000)
 }
 
-// Tree chopping inside 20x20 field
 async function treeLoop() {
   const center = settings.field.center
   const half = settings.field.size / 2
@@ -103,19 +98,34 @@ async function treeLoop() {
         const block = bot.blockAt(pos)
         await bot.dig(block)
         console.log(`🌲 Broke log at ${pos}`)
+
+        // Replant sapling if enabled
+        if (settings["wood-collector"]["replant-saplings"]) {
+          const ground = bot.blockAt(pos.offset(0, -1, 0))
+          if (ground && (ground.name.includes("dirt") || ground.name.includes("grass"))) {
+            const sapling = bot.inventory.items().find(i => i.name.includes("sapling"))
+            if (sapling) {
+              try {
+                await bot.equip(sapling, 'hand')
+                await bot.placeBlock(ground, new Vec3(0, 1, 0))
+                console.log(`🌱 Replanted sapling at ${pos}`)
+              } catch (e) {
+                console.log("⚠️ Sapling planting failed:", e.message)
+              }
+            }
+          }
+        }
       } catch (e) {
         console.log("❌ Dig error:", e.message)
       }
     }
   }
 
-  // Deposit if inventory full
   if (bot.inventory.items().length >= 30 && settings.wood-collector.chest.enabled) {
     await depositWood()
   }
 }
 
-// Put items into chest
 async function depositWood() {
   const chestPos = new Vec3(
     settings.wood-collector.chest.x,
