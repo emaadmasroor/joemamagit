@@ -11,11 +11,10 @@
     "version": "1.12.1"
   },
 
-  "position": {
-    "enabled": false,
-    "x": 0,
-    "y": 0,
-    "z": 0
+  "field": {
+    "enabled": true,
+    "center": { "x": -760, "y": 63, "z": 1460 }, 
+    "size": 20
   },
 
   "utils": {
@@ -30,14 +29,10 @@
     },
 
     "chat-messages": {
-      "enabled": true,
-      "repeat": true,
+      "enabled": false,
+      "repeat": false,
       "repeat-delay": 60,
-      "messages": [
-        "I'm a regular Spicy content creator",
-        "Emaad Daddy",
-        "I Like kids under 3!"
-      ]
+      "messages": []
     },
 
     "chat-log": true,
@@ -48,13 +43,19 @@
   "wood-collector": {
     "enabled": true,
     "tree-blocks": ["oak_log", "birch_log", "spruce_log"], 
-    "replant-saplings": false,
-    "check-radius": 16,
+    "replant-saplings": true,
+    "check-radius": 10,
     "chest": {
       "enabled": true,
       "x": -766,
       "y": 63,
       "z": 1463
+    },
+    "bed": {
+      "enabled": true,
+      "x": -764,
+      "y": 63,
+      "z": 1462
     }
   },
 
@@ -63,3 +64,4 @@
     "leave-delay": 30000
   }
 }
+
