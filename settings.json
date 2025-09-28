@@ -1,25 +1,50 @@
 {
   "bot-account": {
-    "username": "your_email_or_username",
-    "password": "your_password",
-    "type": "microsoft"
+    "username": "Mia_K",
+    "password": "",
+    "type": "mojang"
   },
+
   "server": {
-    "ip": "play.example.com",
-    "port": 25565,
-    "version": "1.20.1"
+    "ip": "jhon_doe_123.aternos.me",
+    "port": 35663,
+    "version": "1.12.1"
   },
+
+  "field": {
+    "center": { "x": -841, "y": 71, "z": 1554 },
+    "size": 20
+  },
+
   "utils": {
     "auto-auth": {
       "enabled": false,
-      "password": "123456"
+      "password": ""
     },
+    "anti-afk": {
+      "enabled": true,
+      "sneak": true
+    },
+    "chat-messages": {
+      "enabled": true,
+      "repeat": true,
+      "repeat-delay": 60,
+      "messages": [
+        "I'm a regular Spicy content creator",
+        "Emaad Daddy",
+        "I Like to Play Minecraft!"
+      ]
+    },
+    "chat-log": true,
+    "auto-reconnect": true,
     "auto-recconect-delay": 5000
   },
+
   "wood-collector": {
     "enabled": true,
-    "check-radius": 20,
+    "tree-blocks": ["oak_log", "birch_log", "spruce_log"],
     "replant-saplings": true,
+    "check-radius": 16,
     "chest": {
       "enabled": true,
       "x": -841,
@@ -27,20 +52,12 @@
       "z": 1554
     }
   },
+
   "sleeping": {
     "enabled": true,
-    "x": -838,
-    "y": 71,
-    "z": 1556
+    "searchRadius": 40
   },
-  "field": {
-    "center": {
-      "x": -841,
-      "y": 71,
-      "z": 1556
-    },
-    "size": 20
-  },
+
   "human-detection": {
     "enabled": true,
     "leave-delay": 30000
