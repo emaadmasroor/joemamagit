@@ -54,7 +54,7 @@ function createBot() {
     const half = settings.field.size / 2;
 
     const logs = bot.findBlocks({
-      matching: block => (block.name === 'log' || block.name === 'log2'),
+      matching: block => block.name.includes('log'),
       maxDistance: settings["wood-collector"]["check-radius"],
       count: 10
     });
@@ -67,7 +67,7 @@ function createBot() {
         try {
           await bot.pathfinder.goto(new GoalNear(pos.x, pos.y, pos.z, 1));
           const block = bot.blockAt(pos);
-          if (block && (block.name === 'log' || block.name === 'log2')) {
+          if (block && block.name.includes('log')) {
             await bot.dig(block);
             console.log(`🌲 Broke log at ${pos}`);
 
@@ -96,12 +96,14 @@ function createBot() {
       try {
         await bot.pathfinder.goto(new GoalNear(chestPos.x, chestPos.y, chestPos.z, 1));
         const chestBlock = bot.blockAt(chestPos);
-        const chest = await bot.openChest(chestBlock);
-        for (const item of bot.inventory.items()) {
-          await chest.deposit(item.type, null, item.count);
-          console.log(`📦 Deposited ${item.name} x${item.count}`);
+        if (chestBlock && chestBlock.name.includes("chest")) {
+          const chest = await bot.openChest(chestBlock);
+          for (const item of bot.inventory.items()) {
+            await chest.deposit(item.type, null, item.count);
+            console.log(`📦 Deposited ${item.name} x${item.count}`);
+          }
+          chest.close();
         }
-        chest.close();
       } catch (err) {
         console.log("❌ Chest error:", err.message);
       }
@@ -113,10 +115,12 @@ function createBot() {
   // ---------------------
   bot.on('time', async () => {
     if (!settings.sleeping.enabled) return;
-    if (bot.time.isNight && bot.nearestEntity(e => e.name === 'bed')) {
-      const bed = bot.findBlock({ matching: block => block.name.includes('bed'), maxDistance: 5 });
-      if (bed) {
+    if (bot.time.isNight) {
+      const bedPos = settings.sleeping;
+      const bed = bot.blockAt(bedPos);
+      if (bed && bed.name.includes('bed')) {
         try {
+          await bot.pathfinder.goto(new GoalNear(bedPos.x, bedPos.y, bedPos.z, 1));
           await bot.sleep(bed);
           console.log('😴 Sleeping...');
         } catch (err) {
@@ -142,10 +146,8 @@ function createBot() {
 
   bot.on('playerLeft', () => {
     const humans = Object.values(bot.players).filter(p => p.username !== bot.username);
-    if (humans.length === 0 && leaveTimeout) {
-      clearTimeout(leaveTimeout);
-      leaveTimeout = null;
-      console.log('[Bot] No humans left, rejoining...');
+    if (humans.length === 0) {
+      console.log('[Bot] Server empty, reconnecting...');
       setTimeout(createBot, 2000);
     }
   });
