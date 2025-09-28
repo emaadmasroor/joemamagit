@@ -46,7 +46,7 @@ function createBot() {
   });
 
   // ---------------------
-  // TREE LOOP (logs only)
+  // TREE LOOP
   // ---------------------
   async function treeLoop() {
     if (!settings["wood-collector"].enabled) return;
@@ -54,7 +54,7 @@ function createBot() {
     const half = settings.field.size / 2;
 
     const logs = bot.findBlocks({
-      matching: block => block.name.includes('log'),
+      matching: block => (block.name === 'log' || block.name === 'log2'),
       maxDistance: settings["wood-collector"]["check-radius"],
       count: 10
     });
@@ -67,7 +67,7 @@ function createBot() {
         try {
           await bot.pathfinder.goto(new GoalNear(pos.x, pos.y, pos.z, 1));
           const block = bot.blockAt(pos);
-          if (block && block.name.includes('log')) {
+          if (block && (block.name === 'log' || block.name === 'log2')) {
             await bot.dig(block);
             console.log(`🌲 Broke log at ${pos}`);
 
@@ -96,14 +96,12 @@ function createBot() {
       try {
         await bot.pathfinder.goto(new GoalNear(chestPos.x, chestPos.y, chestPos.z, 1));
         const chestBlock = bot.blockAt(chestPos);
-        if (chestBlock && chestBlock.name.includes("chest")) {
-          const chest = await bot.openChest(chestBlock);
-          for (const item of bot.inventory.items()) {
-            await chest.deposit(item.type, null, item.count);
-            console.log(`📦 Deposited ${item.name} x${item.count}`);
-          }
-          chest.close();
+        const chest = await bot.openChest(chestBlock);
+        for (const item of bot.inventory.items()) {
+          await chest.deposit(item.type, null, item.count);
+          console.log(`📦 Deposited ${item.name} x${item.count}`);
         }
+        chest.close();
       } catch (err) {
         console.log("❌ Chest error:", err.message);
       }
@@ -111,18 +109,23 @@ function createBot() {
   }
 
   // ---------------------
-  // SLEEPING
+  // SLEEPING (search any bed within 40 blocks)
   // ---------------------
   bot.on('time', async () => {
     if (!settings.sleeping.enabled) return;
     if (bot.time.isNight) {
-      const bedPos = settings.sleeping;
-      const bed = bot.blockAt(bedPos);
-      if (bed && bed.name.includes('bed')) {
+      const bed = bot.findBlock({
+        matching: b => b.name.includes('bed'),
+        maxDistance: settings.sleeping.searchRadius
+      });
+
+      if (bed) {
         try {
-          await bot.pathfinder.goto(new GoalNear(bedPos.x, bedPos.y, bedPos.z, 1));
-          await bot.sleep(bed);
-          console.log('😴 Sleeping...');
+          if (!bot.isSleeping) {
+            await bot.pathfinder.goto(new GoalNear(bed.position.x, bed.position.y, bed.position.z, 1));
+            await bot.sleep(bed);
+            console.log('😴 Sleeping...');
+          }
         } catch (err) {
           console.log('❌ Sleep error:', err.message);
         }
@@ -135,8 +138,11 @@ function createBot() {
   // ---------------------
   bot.on('playerJoined', (player) => {
     if (player.username === bot.username) return;
+    if (!settings["human-detection"].enabled) return;
+
     console.log(`[Bot] Human joined: ${player.username}`);
-    if (settings["human-detection"].enabled && !leaveTimeout) {
+
+    if (!leaveTimeout) {
       leaveTimeout = setTimeout(() => {
         console.log('[Bot] Leaving because a human is online');
         bot.quit('Human detected');
@@ -145,9 +151,15 @@ function createBot() {
   });
 
   bot.on('playerLeft', () => {
+    if (!settings["human-detection"].enabled) return;
+
     const humans = Object.values(bot.players).filter(p => p.username !== bot.username);
     if (humans.length === 0) {
-      console.log('[Bot] Server empty, reconnecting...');
+      if (leaveTimeout) {
+        clearTimeout(leaveTimeout);
+        leaveTimeout = null;
+      }
+      console.log('[Bot] No humans left, rejoining...');
       setTimeout(createBot, 2000);
     }
   });
