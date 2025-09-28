@@ -1,68 +1,46 @@
 {
   "bot-account": {
-    "username": "Mia_K",
-    "password": "",
-    "type": "mojang"
+    "username": "your_email_or_username",
+    "password": "your_password",
+    "type": "microsoft"
   },
-
   "server": {
-    "ip": "jhon_doe_123.aternos.me",
-    "port": 35663,
-    "version": "1.12.1"
+    "ip": "play.example.com",
+    "port": 25565,
+    "version": "1.20.1"
   },
-
   "utils": {
     "auto-auth": {
       "enabled": false,
-      "password": ""
+      "password": "123456"
     },
-
-    "anti-afk": {
-      "enabled": true,
-      "sneak": true
-    },
-
-    "chat-messages": {
-      "enabled": false,
-      "repeat": false,
-      "repeat-delay": 60,
-      "messages": []
-    },
-
-    "chat-log": true,
-    "auto-reconnect": true,
     "auto-recconect-delay": 5000
   },
-
-  "field": {
-    "center": { "x": -841, "y": 71, "z": 1554 },
-    "size": 20
-  },
-
   "wood-collector": {
     "enabled": true,
-    "tree-blocks": ["log", "log2"],
     "check-radius": 20,
+    "replant-saplings": true,
     "chest": {
       "enabled": true,
       "x": -841,
       "y": 71,
       "z": 1554
-    },
-    "replant-saplings": true
+    }
   },
-
-  "bed": {
+  "sleeping": {
     "enabled": true,
     "x": -838,
     "y": 71,
     "z": 1556
   },
-
-  "sleeping": {
-    "enabled": true
+  "field": {
+    "center": {
+      "x": -841,
+      "y": 71,
+      "z": 1556
+    },
+    "size": 20
   },
-
   "human-detection": {
     "enabled": true,
     "leave-delay": 30000
