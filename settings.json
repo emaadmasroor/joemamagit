@@ -11,12 +11,6 @@
     "version": "1.12.1"
   },
 
-  "field": {
-    "enabled": true,
-    "center": { "x": -760, "y": 63, "z": 1460 }, 
-    "size": 20
-  },
-
   "utils": {
     "auto-auth": {
       "enabled": false,
@@ -40,23 +34,33 @@
     "auto-recconect-delay": 5000
   },
 
+  "field": {
+    "center": { "x": -841, "y": 71, "z": 1554 },
+    "size": 20
+  },
+
   "wood-collector": {
     "enabled": true,
-    "tree-blocks": ["oak_log", "birch_log", "spruce_log"], 
-    "replant-saplings": true,
-    "check-radius": 10,
+    "tree-blocks": ["log", "log2"],
+    "check-radius": 20,
     "chest": {
       "enabled": true,
       "x": -841,
       "y": 71,
       "z": 1554
     },
-    "bed": {
-      "enabled": true,
-      "x": -838,
-      "y": 71,
-      "z": 1556
-    }
+    "replant-saplings": true
+  },
+
+  "bed": {
+    "enabled": true,
+    "x": -838,
+    "y": 71,
+    "z": 1556
+  },
+
+  "sleeping": {
+    "enabled": true
   },
 
   "human-detection": {
@@ -64,4 +68,3 @@
     "leave-delay": 30000
   }
 }
-
