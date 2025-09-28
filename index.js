@@ -1,155 +1,165 @@
-const mineflayer = require('mineflayer')
-const Vec3 = require('vec3')
-const { pathfinder, Movements, goals } = require('mineflayer-pathfinder')
-const { GoalNear } = goals
-const autoeat = require('mineflayer-auto-eat').plugin
+// ---------------------
+// EXPRESS SERVER (Replit compatible)
+// ---------------------
+const express = require('express');
+const app = express();
+const port = process.env.PORT || 3000;
+app.get('/', (req, res) => res.send('AFK Bot is alive!'));
+app.listen(port, '0.0.0.0', () => console.log(`[Server] Listening on port ${port}`));
 
-const settings = require('./settings.json')
+// ---------------------
+// BOT CORE
+// ---------------------
+const mineflayer = require('mineflayer');
+const { pathfinder, Movements, goals: { GoalNear } } = require('mineflayer-pathfinder');
+const settings = require('./settings.json');
 
-let bot
+let bot;
+let leaveTimeout = null;
 
-function startBot() {
+function createBot() {
   bot = mineflayer.createBot({
+    username: settings["bot-account"].username,
+    password: settings["bot-account"].password,
+    auth: settings["bot-account"].type,
     host: settings.server.ip,
     port: settings.server.port,
-    username: settings["bot-account"].username,
-    password: settings["bot-account"].password || undefined,
     version: settings.server.version
-  })
+  });
 
-  bot.loadPlugin(pathfinder)
-  bot.loadPlugin(autoeat)
+  bot.loadPlugin(pathfinder);
+  const mcData = require('minecraft-data')(bot.version);
+  const defaultMove = new Movements(bot, mcData);
+  bot.pathfinder.setMovements(defaultMove);
 
-  bot.on('chat', (username, message) => {
-    if (settings.utils["chat-log"]) console.log(`[CHAT] <${username}> ${message}`)
-  })
+  // ---------------------
+  // SPAWN EVENT
+  // ---------------------
+  bot.once('spawn', () => {
+    console.log('[Bot] Spawned');
 
-  bot.on('spawn', () => {
-    console.log("✅ Bot spawned in world")
-    const mcData = require('minecraft-data')(bot.version)
-    const defaultMove = new Movements(bot, mcData)
-    bot.pathfinder.setMovements(defaultMove)
-
-    if (settings.wood-collector.enabled) {
-      setInterval(treeLoop, 10000)
+    if (settings.utils["auto-auth"].enabled) {
+      bot.chat(`/login ${settings.utils["auto-auth"].password}`);
     }
 
-    nightLoop()
-  })
+    setInterval(treeLoop, 15000); // check for trees every 15s
+  });
 
-  bot.on('end', () => {
-    if (settings.utils["auto-reconnect"]) {
-      console.log("⏳ Bot disconnected, reconnecting...")
-      setTimeout(startBot, settings.utils["auto-recconect-delay"] || 5000)
-    }
-  })
+  // ---------------------
+  // TREE LOOP (logs only)
+  // ---------------------
+  async function treeLoop() {
+    if (!settings["wood-collector"].enabled) return;
+    const center = settings.field.center;
+    const half = settings.field.size / 2;
 
-  if (settings["human-detection"].enabled) {
-    bot.on('playerJoined', (player) => {
-      if (player.username !== bot.username) {
-        console.log("👤 Human joined, leaving soon...")
-        setTimeout(() => bot.quit(), settings["human-detection"]["leave-delay"])
-      }
-    })
-  }
-}
+    const logs = bot.findBlocks({
+      matching: block => (block.name === 'log' || block.name === 'log2'),
+      maxDistance: settings["wood-collector"]["check-radius"],
+      count: 10
+    });
 
-function nightLoop() {
-  setInterval(async () => {
-    if (settings.wood-collector.bed.enabled) {
-      if (!bot.time.isDay) {
-        const bedPos = new Vec3(
-          settings.wood-collector.bed.x,
-          settings.wood-collector.bed.y,
-          settings.wood-collector.bed.z
-        )
-        const bedBlock = bot.blockAt(bedPos)
-        if (bedBlock) {
-          try {
-            await bot.pathfinder.goto(new GoalNear(bedPos.x, bedPos.y, bedPos.z, 1))
-            await bot.sleep(bedBlock)
-            console.log("😴 Bot is sleeping...")
-          } catch (e) {
-            console.log("❌ Sleep failed:", e.message)
-          }
-        }
-      }
-    }
-  }, 20000)
-}
+    for (let pos of logs) {
+      if (
+        pos.x >= center.x - half && pos.x <= center.x + half &&
+        pos.z >= center.z - half && pos.z <= center.z + half
+      ) {
+        try {
+          await bot.pathfinder.goto(new GoalNear(pos.x, pos.y, pos.z, 1));
+          const block = bot.blockAt(pos);
+          if (block && (block.name === 'log' || block.name === 'log2')) {
+            await bot.dig(block);
+            console.log(`🌲 Broke log at ${pos}`);
 
-async function treeLoop() {
-  const center = settings.field.center
-  const half = settings.field.size / 2
-
-  const logs = bot.findBlocks({
-    matching: block => settings["wood-collector"]["tree-blocks"].includes(block.name),
-    maxDistance: settings.wood-collector["check-radius"] || 10,
-    count: 5
-  })
-
-  for (let pos of logs) {
-    if (
-      pos.x >= center.x - half && pos.x <= center.x + half &&
-      pos.z >= center.z - half && pos.z <= center.z + half
-    ) {
-      try {
-        await bot.pathfinder.goto(new GoalNear(pos.x, pos.y, pos.z, 1))
-        const block = bot.blockAt(pos)
-        await bot.dig(block)
-        console.log(`🌲 Broke log at ${pos}`)
-
-        // Replant sapling if enabled
-        if (settings["wood-collector"]["replant-saplings"]) {
-          const ground = bot.blockAt(pos.offset(0, -1, 0))
-          if (ground && (ground.name.includes("dirt") || ground.name.includes("grass"))) {
-            const sapling = bot.inventory.items().find(i => i.name.includes("sapling"))
-            if (sapling) {
-              try {
-                await bot.equip(sapling, 'hand')
-                await bot.placeBlock(ground, new Vec3(0, 1, 0))
-                console.log(`🌱 Replanted sapling at ${pos}`)
-              } catch (e) {
-                console.log("⚠️ Sapling planting failed:", e.message)
+            // Replant sapling if enabled
+            if (settings["wood-collector"]["replant-saplings"]) {
+              const sapling = bot.inventory.items().find(i => i.name.includes('sapling'));
+              if (sapling) {
+                const dirt = bot.blockAt(pos.offset(0, -1, 0));
+                if (dirt && dirt.name.includes('dirt')) {
+                  await bot.equip(sapling, 'hand');
+                  await bot.placeBlock(dirt, { x: 0, y: 1, z: 0 });
+                  console.log(`🌱 Replanted sapling at ${pos}`);
+                }
               }
             }
           }
+        } catch (e) {
+          console.log("❌ Tree loop error:", e.message);
         }
-      } catch (e) {
-        console.log("❌ Dig error:", e.message)
+      }
+    }
+
+    // Inventory check → deposit in chest
+    if (settings["wood-collector"].chest.enabled && bot.inventory.items().length > 20) {
+      const chestPos = settings["wood-collector"].chest;
+      try {
+        await bot.pathfinder.goto(new GoalNear(chestPos.x, chestPos.y, chestPos.z, 1));
+        const chestBlock = bot.blockAt(chestPos);
+        const chest = await bot.openChest(chestBlock);
+        for (const item of bot.inventory.items()) {
+          await chest.deposit(item.type, null, item.count);
+          console.log(`📦 Deposited ${item.name} x${item.count}`);
+        }
+        chest.close();
+      } catch (err) {
+        console.log("❌ Chest error:", err.message);
       }
     }
   }
 
-  if (bot.inventory.items().length >= 30 && settings.wood-collector.chest.enabled) {
-    await depositWood()
-  }
-}
-
-async function depositWood() {
-  const chestPos = new Vec3(
-    settings.wood-collector.chest.x,
-    settings.wood-collector.chest.y,
-    settings.wood-collector.chest.z
-  )
-  const chestBlock = bot.blockAt(chestPos)
-  if (!chestBlock) return
-
-  try {
-    await bot.pathfinder.goto(new GoalNear(chestPos.x, chestPos.y, chestPos.z, 1))
-    const chest = await bot.openChest(chestBlock)
-
-    for (let item of bot.inventory.items()) {
-      if (item.name.includes("log") || item.name.includes("planks") || item.name.includes("sapling")) {
-        await chest.deposit(item.type, null, item.count)
-        console.log(`📦 Deposited ${item.count} ${item.name}`)
+  // ---------------------
+  // SLEEPING
+  // ---------------------
+  bot.on('time', async () => {
+    if (!settings.sleeping.enabled) return;
+    if (bot.time.isNight && bot.nearestEntity(e => e.name === 'bed')) {
+      const bed = bot.findBlock({ matching: block => block.name.includes('bed'), maxDistance: 5 });
+      if (bed) {
+        try {
+          await bot.sleep(bed);
+          console.log('😴 Sleeping...');
+        } catch (err) {
+          console.log('❌ Sleep error:', err.message);
+        }
       }
     }
+  });
 
-    chest.close()
-  } catch (e) {
-    console.log("❌ Chest deposit failed:", e.message)
-  }
+  // ---------------------
+  // HUMAN DETECTION
+  // ---------------------
+  bot.on('playerJoined', (player) => {
+    if (player.username === bot.username) return;
+    console.log(`[Bot] Human joined: ${player.username}`);
+    if (settings["human-detection"].enabled && !leaveTimeout) {
+      leaveTimeout = setTimeout(() => {
+        console.log('[Bot] Leaving because a human is online');
+        bot.quit('Human detected');
+      }, settings["human-detection"]["leave-delay"]);
+    }
+  });
+
+  bot.on('playerLeft', () => {
+    const humans = Object.values(bot.players).filter(p => p.username !== bot.username);
+    if (humans.length === 0 && leaveTimeout) {
+      clearTimeout(leaveTimeout);
+      leaveTimeout = null;
+      console.log('[Bot] No humans left, rejoining...');
+      setTimeout(createBot, 2000);
+    }
+  });
+
+  // ---------------------
+  // AUTO-RECONNECT
+  // ---------------------
+  bot.on('end', () => {
+    console.log('[Bot] Disconnected. Reconnecting...');
+    setTimeout(createBot, settings.utils["auto-recconect-delay"]);
+  });
+
+  bot.on('kicked', reason => console.log(`[Bot] Kicked: ${reason}`));
+  bot.on('error', err => console.log(`[Bot Error] ${err.message}`));
 }
 
-startBot()
+createBot();
