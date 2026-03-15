@@ -1,14 +1,12 @@
 {
   "bot-account": {
-    "username": "Mia_K",
-    "password": "",
-    "type": "mojang"
+    "username": "Mia_K"
   },
 
   "server": {
-    "ip": "jhon_doe_123.aternos.me",
-    "port": 35663,
-    "version": "1.12.1"
+    "ip": "laadleghopghop.aternos.me",
+    "port": 29376,
+    "version": "1.21.11"
   },
 
   "field": {
@@ -16,50 +14,14 @@
     "size": 20
   },
 
-  "utils": {
-    "auto-auth": {
-      "enabled": false,
-      "password": ""
-    },
-    "anti-afk": {
-      "enabled": true,
-      "sneak": true
-    },
-    "chat-messages": {
-      "enabled": true,
-      "repeat": true,
-      "repeat-delay": 60,
-      "messages": [
-        "I'm a regular Spicy content creator",
-        "Emaad Daddy",
-        "I Like to Play Minecraft!"
-      ]
-    },
-    "chat-log": true,
-    "auto-reconnect": true,
-    "auto-recconect-delay": 5000
-  },
-
   "wood-collector": {
     "enabled": true,
-    "tree-blocks": ["oak_log", "birch_log", "spruce_log"],
     "replant-saplings": true,
     "check-radius": 16,
     "chest": {
-      "enabled": true,
       "x": -841,
       "y": 71,
       "z": 1554
     }
-  },
-
-  "sleeping": {
-    "enabled": true,
-    "searchRadius": 40
-  },
-
-  "human-detection": {
-    "enabled": true,
-    "leave-delay": 30000
   }
 }
