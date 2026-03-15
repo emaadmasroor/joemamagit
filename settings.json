@@ -6,8 +6,8 @@
   "server": {
     "ip": "laadleghopghop.aternos.me",
     "port": 29376,
-    "version": "1.21.11(0.18.4)"
-  },
+    "version": false
+  }
 
   "field": {
     "center": { "x": -841, "y": 71, "z": 1554 },
