@@ -7,7 +7,7 @@
     "ip": "laadleghopghop.aternos.me",
     "port": 29376,
     "version": false
-  }
+  },
 
   "field": {
     "center": { "x": -841, "y": 71, "z": 1554 },
@@ -19,7 +19,7 @@
     "replant-saplings": true,
     "check-radius": 16,
     "chest": {
-      "x": -841,
+      "x": -838,
       "y": 71,
       "z": 1554
     }
