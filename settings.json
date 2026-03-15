@@ -1,6 +1,7 @@
 {
   "bot-account": {
-    "username": "Mia_K"
+    "username": "Mia_K",
+    "type": "offline"
   },
 
   "server": {
@@ -10,14 +11,18 @@
   },
 
   "field": {
-    "center": { "x": -841, "y": 71, "z": 1554 },
+    "center": {
+      "x": -841,
+      "y": 71,
+      "z": 1554
+    },
     "size": 20
   },
 
   "wood-collector": {
     "enabled": true,
-    "replant-saplings": true,
     "check-radius": 16,
+    "replant-saplings": true,
     "chest": {
       "x": -838,
       "y": 71,
