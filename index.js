@@ -1,134 +1,167 @@
 // ---------------------
-// EXPRESS SERVER (Replit compatible)
-// --------------------- 
-const express = require('express');
-const app = express();
-const port = process.env.PORT || 3000;
+// EXPRESS SERVER (Render keep-alive)
+// ---------------------
+const express = require('express')
+const app = express()
+const port = process.env.PORT || 3000
 
-app.get('/', (req, res) => res.send('Bot is alive'));
-app.listen(port, '0.0.0.0');
+app.get('/', (req, res) => res.send('Bot running'))
+app.listen(port, '0.0.0.0', () => console.log("Web server started"))
+
 
 // ---------------------
 // BOT CORE
 // ---------------------
-const mineflayer = require('mineflayer');
-const { pathfinder, Movements, goals: { GoalNear } } = require('mineflayer-pathfinder');
-const settings = require('./settings.json');
+const mineflayer = require('mineflayer')
+const { pathfinder, Movements, goals: { GoalNear } } = require('mineflayer-pathfinder')
+const settings = require('./settings.json')
 
-let bot;
+let bot
 
 function createBot() {
+
+  console.log("Creating bot...")
+
   bot = mineflayer.createBot({
-    username: settings["bot-account"].username,
     host: settings.server.ip,
     port: settings.server.port,
-    version: settings.server.version
-  });
+    username: settings["bot-account"].username,
+    version: settings.server.version,
+    auth: "offline" // IMPORTANT for Aternos
+  })
 
-  bot.loadPlugin(pathfinder);
+  bot.loadPlugin(pathfinder)
 
-  bot.once('spawn', async () => {
-    console.log('[Bot] Spawned');
 
-    // 🔐 FORCE LOGIN EVERY TIME
+  // ---------------------
+  // CONNECTION LOGGING
+  // ---------------------
+
+  bot.on('login', () => {
+    console.log("Bot logged into server")
+  })
+
+  bot.on('spawn', async () => {
+    console.log("Bot spawned in world")
+
+    // login command for auth plugins
     setTimeout(() => {
-      bot.chat('/login serverbot serverbot');
-      console.log('[Bot] Logged in');
-    }, 3000);
+      bot.chat("/login serverbot serverbot")
+      console.log("Login command sent")
+    }, 6000)
 
-    const mcData = require('minecraft-data')(bot.version);
-    const defaultMove = new Movements(bot, mcData);
-    bot.pathfinder.setMovements(defaultMove);
+    const mcData = require('minecraft-data')(bot.version)
+    const movements = new Movements(bot, mcData)
+    bot.pathfinder.setMovements(movements)
 
-    setInterval(treeLoop, 10000); // run every 10s
-  });
+    setInterval(treeLoop, 10000)
+  })
+
 
   // ---------------------
   // TREE LOOP
   // ---------------------
+
   async function treeLoop() {
+
     try {
 
-      // If inventory almost full → deposit wood
       if (bot.inventory.emptySlotCount() === 0) {
-        await depositWood();
-        return;
+        await depositWood()
+        return
       }
 
       const logs = bot.findBlocks({
-        matching: block => block.name.includes('log'),
+        matching: block => block.name.includes("log"),
         maxDistance: 32,
         count: 5
-      });
+      })
 
-      for (let pos of logs) {
+      for (const pos of logs) {
+
         try {
-          await bot.pathfinder.goto(new GoalNear(pos.x, pos.y, pos.z, 1));
 
-          const block = bot.blockAt(pos);
-          if (!block || !block.name.includes('log')) continue;
+          await bot.pathfinder.goto(new GoalNear(pos.x, pos.y, pos.z, 1))
 
-          await bot.dig(block);
-          console.log(`Broke ${block.name}`);
+          const block = bot.blockAt(pos)
+          if (!block || !block.name.includes("log")) continue
 
-          // 🌱 Replant
-          const sapling = bot.inventory.items().find(i => i.name.includes('sapling'));
-          const dirt = bot.blockAt(pos.offset(0, -1, 0));
+          await bot.dig(block)
 
-          if (sapling && dirt && dirt.name.includes('dirt')) {
-            await bot.equip(sapling, 'hand');
-            await bot.placeBlock(dirt, { x: 0, y: 1, z: 0 });
-            console.log('Replanted sapling');
+          console.log("Broke", block.name)
+
+          const sapling = bot.inventory.items().find(i => i.name.includes("sapling"))
+          const dirt = bot.blockAt(pos.offset(0, -1, 0))
+
+          if (sapling && dirt && dirt.name.includes("dirt")) {
+            await bot.equip(sapling, "hand")
+            await bot.placeBlock(dirt, { x: 0, y: 1, z: 0 })
+            console.log("Replanted sapling")
           }
 
         } catch (err) {
-          console.log("Tree error:", err.message);
+          console.log("Tree error:", err.message)
         }
+
       }
 
     } catch (err) {
-      console.log("Loop error:", err.message);
+      console.log("Loop error:", err.message)
     }
+
   }
 
+
   // ---------------------
-  // DEPOSIT WOOD ONLY
+  // CHEST DEPOSIT
   // ---------------------
+
   async function depositWood() {
-    const chestPos = settings["wood-collector"].chest;
+
+    const chestPos = settings["wood-collector"].chest
 
     try {
-      await bot.pathfinder.goto(new GoalNear(chestPos.x, chestPos.y, chestPos.z, 1));
 
-      const chestBlock = bot.blockAt(chestPos);
-      const chest = await bot.openChest(chestBlock);
+      await bot.pathfinder.goto(new GoalNear(chestPos.x, chestPos.y, chestPos.z, 1))
+
+      const chestBlock = bot.blockAt(chestPos)
+      const chest = await bot.openChest(chestBlock)
 
       const woodItems = bot.inventory.items().filter(i =>
-        i.name.includes('log') || i.name.includes('planks')
-      );
+        i.name.includes("log") || i.name.includes("planks")
+      )
 
       for (const item of woodItems) {
-        await chest.deposit(item.type, null, item.count);
-        console.log(`Deposited ${item.name} x${item.count}`);
+        await chest.deposit(item.type, null, item.count)
+        console.log("Deposited", item.name, item.count)
       }
 
-      chest.close();
+      chest.close()
 
     } catch (err) {
-      console.log("Chest error:", err.message);
+      console.log("Chest error:", err.message)
     }
+
   }
 
-  // ---------------------
-  // AUTO RECONNECT ONLY
-  // ---------------------
-  bot.on('end', () => {
-    console.log('[Bot] Disconnected. Reconnecting...');
-    setTimeout(createBot, 5000);
-  });
 
-  bot.on('kicked', reason => console.log('[Bot] Kicked:', reason));
-  bot.on('error', err => console.log('[Bot Error]', err.message));
+  // ---------------------
+  // RECONNECT LOGIC
+  // ---------------------
+
+  bot.on("end", () => {
+    console.log("Bot disconnected. Reconnecting in 10s...")
+    setTimeout(createBot, 10000)
+  })
+
+  bot.on("kicked", reason => {
+    console.log("Bot kicked:", reason)
+  })
+
+  bot.on("error", err => {
+    console.log("Bot error:", err)
+  })
+
 }
 
-createBot();
+createBot()
